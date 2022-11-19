@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cortex-debug",
+            "request": "launch",
+            "name": "Debug (OpenOCD)",
+            "servertype": "openocd",
+            "cwd": "${workspaceRoot}",
+            "executable": "./target/thumbv6m-none-eabi/debug/stm32-transponder",
+            "preLaunchTask": "build",
+            // "device": "STM32F030R8Tb",
+            // "device": "STM32L053R8Tb",
+            "configFiles": [
+                "interface/stlink.cfg",
+                // "target/stm32f0x.cfg"
+                "target/stm32l0.cfg"
+            ],
+            "postLaunchCommands": [
+                "monitor arm semihosting enable",
+            ],
+            // "svdFile": "${workspaceRoot}/STM32F303.svd",
+            "runToMain": true,
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 8000000,
+                "swoFrequency": 2000000,
+                "source": "probe",
+                "decoders": [
+                    {
+                        "type": "console",
+                        "label": "ITM",
+                        "port": 0
+                    }
+                ]
+            }
+        }
+    ]
+}

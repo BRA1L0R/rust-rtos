@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cargo",
+            "command": "build",
+            "args": ["--features", "cortex-m0+"],
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "group": "build",
+            "label": "build"
+        },
+    ]
+}
