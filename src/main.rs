@@ -6,37 +6,35 @@ extern crate alloc;
 
 use alloc_cortex_m::CortexMHeap;
 use cortex_m_rt::entry;
-
-use cortex_m_semihosting::hprintln;
 use panic_semihosting as _;
 
-use stm32_transponder::{api::r#yield, supervisor::SupervisorBuilder};
+use rust_rtos::{api::r#yield, supervisor::SupervisorBuilder};
 use stm32f0xx_hal as _;
 
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
 
 extern "C" fn first_task() -> ! {
-    let mut a = 10;
+    let mut _a = 10;
     loop {
         r#yield();
-        a += 1;
+        _a += 1;
     }
 }
 
 extern "C" fn second_task() -> ! {
-    let mut a: i32 = 20;
+    let mut _a: i32 = 20;
     loop {
         r#yield();
-        a += 1;
+        _a += 1;
     }
 }
 
 extern "C" fn third_task() -> ! {
-    let mut a: i32 = 20;
+    let mut _a: i32 = 20;
     loop {
         r#yield();
-        a += 1;
+        _a += 1;
     }
 }
 
@@ -52,7 +50,6 @@ fn entry() -> ! {
         .add_task(third_task);
 
     let free = ALLOCATOR.free();
-    hprintln!("Free memory: {}", free);
 
     supervisor.start();
 }

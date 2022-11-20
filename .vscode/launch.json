@@ -7,7 +7,7 @@
             "name": "Debug (OpenOCD)",
             "servertype": "openocd",
             "cwd": "${workspaceRoot}",
-            "executable": "./target/thumbv6m-none-eabi/debug/stm32-transponder",
+            "executable": "./target/thumbv6m-none-eabi/debug/stm32-test",
             "preLaunchTask": "build",
             // "device": "STM32F030R8Tb",
             // "device": "STM32L053R8Tb",

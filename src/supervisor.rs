@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::{cell::RefCell, convert::Infallible};
 
 use crate::{
     arch::start_cold,
@@ -80,7 +80,7 @@ impl SupervisorBuilder {
         );
 
         let stack_pointer = with_supervisor(|spv| spv.sched.current().sp());
-        start_cold(stack_pointer);
+        start_cold(stack_pointer)
 
         // panic!("exception returned in main")
     }
