@@ -15,7 +15,7 @@ pub type Stack = [MaybeUninit<u8>; STACK_SIZE];
 
 #[derive(Default)]
 #[repr(C)]
-pub struct ExtendedFrame {
+struct ExtendedFrame {
     // extended register content [40 bytes]
     /// control register
     control: u32,
@@ -55,13 +55,19 @@ impl ExtendedFrame {
     }
 }
 
+/// Opaque type representing an aligned
+/// frame ready to be loaded
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
+pub struct TaskFrame(*mut ExtendedFrame);
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Task {
     stack: Pin<Box<Stack>>,
     /// offset from stack base,
     /// NOT absolute address
-    pub(super) suspended_stack: *mut ExtendedFrame,
+    pub(super) suspended_stack: TaskFrame,
 }
 
 unsafe impl Send for Task {}
@@ -69,6 +75,7 @@ unsafe impl Send for Task {}
 impl Task {
     pub fn create(entry: TaskEntrypoint) -> Self {
         // create a new uninitialized stack for the task
+        // safety: assuming init a MaybeUninit<u8> array
         let mut stack: Box<Stack> = unsafe { Box::new_uninit().assume_init() };
 
         const STACK_OFFSET: usize = STACK_SIZE - size_of::<ExtendedFrame>();
@@ -87,11 +94,11 @@ impl Task {
 
         Self {
             stack: Pin::new(stack),
-            suspended_stack: exception_frame,
+            suspended_stack: TaskFrame(exception_frame),
         }
     }
 
-    pub fn sp(&self) -> *mut ExtendedFrame {
+    pub fn sp(&self) -> TaskFrame {
         self.suspended_stack
     }
 }

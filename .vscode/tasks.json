@@ -4,7 +4,10 @@
         {
             "type": "cargo",
             "command": "build",
-            "args": ["--features", "cortex-m0+"],
+            "args": [
+                "--features",
+                "cortex-m0+ l053r8",
+            ],
             "problemMatcher": [
                 "$rustc"
             ],

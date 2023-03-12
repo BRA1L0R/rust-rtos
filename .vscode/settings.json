@@ -1,5 +1,8 @@
 {
   "cortex-debug.variableUseNaturalFormat": false,
   "rust-analyzer.procMacro.enable": true,
-  "rust-analyzer.cargo.features": ["cortex-m0+"],
+  "rust-analyzer.cargo.features": [
+    "cortex-m0+",
+    "l053r8"
+  ],
 }

@@ -1,6 +1,6 @@
 use crate::supervisor::with_supervisor;
 
-use self::task::{ExtendedFrame, Task};
+use self::task::{Task, TaskFrame};
 
 pub mod task;
 
@@ -9,10 +9,13 @@ pub mod task;
 // [r4-r7] 5*u32 - [r8-r12] 5*u32 - [default] 8*u32
 // Total:
 
+/// Returned argument is the next task to be loaded
 #[no_mangle]
-extern "C" fn pendsv(stack_pointer: *mut ExtendedFrame) -> *mut ExtendedFrame {
+extern "C" fn context_switch(stack_pointer: TaskFrame) -> TaskFrame {
     with_supervisor(|spv| spv.sched.context_switch(stack_pointer))
 }
+
+// static SCHEDULER: Mutex<RefCell<Scheduler>> = Mutex::new(RefCell::new)
 
 #[derive(Default)]
 pub(crate) struct Scheduler {
@@ -34,7 +37,7 @@ impl Scheduler {
         &self.tasks[self.last]
     }
 
-    fn context_switch(&mut self, last_stack: *mut ExtendedFrame) -> *mut ExtendedFrame {
+    fn context_switch(&mut self, last_stack: TaskFrame) -> TaskFrame {
         self.current_mut().suspended_stack = last_stack;
         self.schedule_next().sp()
     }

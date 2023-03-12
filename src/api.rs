@@ -2,7 +2,24 @@ use core::arch::asm;
 
 use super::syscall::SVCallId;
 
-#[inline(always)]
+// unsafe extern "C" fn syscall(_id: u32, _args: ...) {
+//     asm!("SVC #0", in("r0") 10);
+// }
+
+macro_rules! syscall {
+    ($id:expr $(,$n:tt : $val:expr)*) => {
+        asm!("SVC #0", in("r0") $id as u32, $(in($n) $val, )*)
+    };
+}
+
 pub fn r#yield() {
-    unsafe { asm!("SVC #{}", const SVCallId::Yield as _) }
+    // unsafe { syscall(SVCallId::Yield as _) }
+    unsafe { syscall!(SVCallId::Yield) }
+}
+
+pub fn print(data: &str) {
+    let dataptr = data.as_ptr();
+    let length = data.len();
+
+    unsafe { syscall!(SVCallId::Print, "r1": dataptr, "r2": length) }
 }

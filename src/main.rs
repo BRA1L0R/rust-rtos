@@ -1,55 +1,47 @@
 #![no_std]
 #![no_main]
-#![feature(default_alloc_error_handler)]
 
 extern crate alloc;
 
-use alloc_cortex_m::CortexMHeap;
 use cortex_m_rt::entry;
 use panic_semihosting as _;
 
-use rust_rtos::{api::r#yield, supervisor::SupervisorBuilder};
-use stm32f0xx_hal as _;
+use rust_rtos::{
+    api::{print, r#yield},
+    KernelBuilder,
+};
 
-#[global_allocator]
-static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
-
-extern "C" fn first_task() -> ! {
+fn first_task() -> ! {
     let mut _a = 10;
     loop {
-        r#yield();
+        print("Task 1\r\n");
         _a += 1;
     }
 }
 
-extern "C" fn second_task() -> ! {
+fn second_task() -> ! {
     let mut _a: i32 = 20;
     loop {
-        r#yield();
+        print("Task 2\r\n");
         _a += 1;
     }
 }
 
-extern "C" fn third_task() -> ! {
+fn third_task() -> ! {
     let mut _a: i32 = 20;
     loop {
-        r#yield();
+        print("Hello world from task 3\r\n");
         _a += 1;
     }
 }
 
 #[entry]
 fn entry() -> ! {
-    // let heap_start: *const u8 = unsafe { &_heap_start };
-    unsafe { ALLOCATOR.init(cortex_m_rt::heap_start() as _, 3100) };
-
     let per = cortex_m::Peripherals::take().unwrap();
-    let supervisor = SupervisorBuilder::new(per)
+    let kernel = KernelBuilder::new(per)
         .add_task(first_task)
         .add_task(second_task)
         .add_task(third_task);
 
-    let free = ALLOCATOR.free();
-
-    supervisor.start();
+    kernel.start();
 }
