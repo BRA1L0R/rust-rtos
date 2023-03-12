@@ -1,12 +1,5 @@
 use core::arch::asm;
 
-// pub fn get_allocator() -> impl GlobalAlloc {
-//     let allocator = CortexMHeap::empty();
-//     unsafe { allocator.init(cortex_m_rt::heap_start() as _, 3100) }
-
-//     allocator
-// }
-
 /// PendSV is THE context-switcher.
 /// Saves the task, decides what to schedule next and loads it
 #[export_name = "PendSV"]

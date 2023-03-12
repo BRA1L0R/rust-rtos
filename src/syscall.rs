@@ -1,4 +1,5 @@
-use crate::{drivers, supervisor};
+use crate::drivers;
+use crate::supervisor::with_supervisor;
 use core::fmt::Debug;
 use core::fmt::Write;
 
@@ -57,7 +58,7 @@ unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
     let mut args = args.into_iter();
 
     match id {
-        SVCallId::Yield => (),
+        SVCallId::Yield => with_supervisor(|sp| sp.pend_switch()),
         SVCallId::Print => {
             let data: *const u8 = next_as!(args).unwrap();
             let length = next_as!(args).unwrap();
@@ -68,6 +69,4 @@ unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
             write!(drivers::tty_writer(), "{data}").unwrap();
         }
     }
-
-    supervisor::with_supervisor(|spv| spv.pend_switch());
 }

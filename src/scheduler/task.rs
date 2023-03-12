@@ -1,5 +1,5 @@
 use core::{
-    mem::{size_of, MaybeUninit},
+    mem::{align_of, size_of, MaybeUninit},
     pin::Pin,
 };
 
@@ -11,7 +11,24 @@ use crate::TaskEntrypoint;
 
 const STACK_SIZE: usize = 256;
 
-pub type Stack = [MaybeUninit<u8>; STACK_SIZE];
+#[repr(C)]
+#[repr(align(4))]
+#[derive(Debug)]
+pub struct Stack([MaybeUninit<u8>; STACK_SIZE]);
+
+impl core::ops::Deref for Stack {
+    type Target = [MaybeUninit<u8>; STACK_SIZE];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl core::ops::DerefMut for Stack {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[derive(Default)]
 #[repr(C)]
@@ -77,14 +94,18 @@ impl Task {
         // create a new uninitialized stack for the task
         // safety: assuming init a MaybeUninit<u8> array
         let mut stack: Box<Stack> = unsafe { Box::new_uninit().assume_init() };
-
         const STACK_OFFSET: usize = STACK_SIZE - size_of::<ExtendedFrame>();
+
+        // Safety: safety of alignment to be verified
+        debug_assert_eq!(align_of::<Stack>(), align_of::<ExtendedFrame>());
         let exception_frame = unsafe { stack.as_mut_ptr().add(STACK_OFFSET) } as *mut ExtendedFrame;
 
         let mut control = Control::from_bits(0);
         control.set_spsel(Spsel::Psp);
         control.set_npriv(Npriv::Unprivileged);
 
+        // Safety: accessing a succesfully allocated memory
+        // space, with a correctly aligned pointer
         unsafe {
             *exception_frame = ExtendedFrame::default()
                 .pc(entry as usize)

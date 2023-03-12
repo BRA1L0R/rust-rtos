@@ -1,8 +1,8 @@
+use core::cell::RefCell;
+use cortex_m::interrupt::{free, Mutex};
+
 #[cfg(feature = "l053r8")]
 pub mod l053r8;
-use core::cell::RefCell;
-
-use cortex_m::interrupt::{free, Mutex};
 #[cfg(feature = "l053r8")]
 pub use l053r8::*;
 
@@ -33,13 +33,11 @@ pub struct Tty {
 
 impl Tty {
     pub const fn empty() -> Self {
-        Self {
-            serial: Mutex::new(RefCell::new(None)),
-        }
+        let serial = Mutex::new(RefCell::new(None));
+        Self { serial }
     }
 
     pub fn populate(&self, serial: SerialTty) {
         free(|cs| self.serial.borrow(cs).replace(Some(serial)));
     }
 }
-

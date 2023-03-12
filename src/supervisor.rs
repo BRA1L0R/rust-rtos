@@ -4,26 +4,29 @@ use crate::scheduler::Scheduler;
 
 extern crate alloc;
 
-use cortex_m::interrupt::{free, Mutex};
+use cortex_m::{
+    interrupt::{free, Mutex},
+    peripheral::SCB,
+};
 
 /// global supervisor instance
 static SUPERVISOR: Mutex<RefCell<Option<Supervisor>>> = Mutex::new(RefCell::new(None));
 
 pub struct Supervisor {
     pub(crate) sched: Scheduler,
-    per: cortex_m::Peripherals,
+    system_control: SCB,
 }
 
 impl Supervisor {
-    pub fn new(per: cortex_m::Peripherals) -> Self {
+    pub fn new(system_control: SCB, sched: Scheduler) -> Self {
         Supervisor {
-            sched: Default::default(),
-            per,
+            sched,
+            system_control,
         }
     }
 
     pub(crate) fn pend_switch(&self) {
-        unsafe { self.per.SCB.icsr.modify(|reg| reg | 0x1 << 28) };
+        unsafe { self.system_control.icsr.modify(|reg| reg | 0x1 << 28) };
     }
 }
 
@@ -31,9 +34,8 @@ pub fn init_supervisor(sup: Supervisor) {
     free(|cs| SUPERVISOR.borrow(cs).replace(Some(sup)));
 }
 
-/// Safety:
-/// This is a critical section. All interrupts are disabled. Pending
-/// interrupts will get handled as soon as the closure is over.
+/// Note: code executed in the closure is subject
+/// to a critical section
 ///
 /// Panic:
 /// panics if not executed inside of a supervised context.

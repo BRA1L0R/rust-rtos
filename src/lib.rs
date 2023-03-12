@@ -5,14 +5,15 @@
 
 use allocator::init_allocator;
 use drivers::init_drivers;
+use scheduler::Scheduler;
 use supervisor::{init_supervisor, Supervisor};
 
 mod allocator;
 pub mod api;
-pub(crate) mod arch;
-pub mod drivers;
+mod arch;
+mod drivers;
 mod scheduler;
-pub mod supervisor;
+mod supervisor;
 mod syscall;
 
 pub type TaskEntrypoint = fn() -> !;
@@ -31,8 +32,9 @@ impl KernelBuilder {
         // init devices
         init_drivers();
 
-        // init supervisor
-        init_supervisor(Supervisor::new(per));
+        // init scheduler and supervisor
+        let scheduler = Scheduler::new(per.SYST);
+        init_supervisor(Supervisor::new(per.SCB, scheduler));
 
         Self(())
     }
@@ -53,7 +55,7 @@ impl KernelBuilder {
 
     /// Starts the supervisor and enters a supervised context
     ///
-    /// ### Panic
+    /// # Panic
     /// Panics if called from an unprivileged context or if
     /// the current stack used is not MSP (main)
     pub fn start(self) -> ! {
@@ -73,7 +75,10 @@ impl KernelBuilder {
             "starting a supervised context using the process stack pointer"
         );
 
-        let stack_pointer = supervisor::with_supervisor(|spv| spv.sched.current().sp());
+        let stack_pointer = supervisor::with_supervisor(|spv| {
+            spv.sched.start_systick();
+            spv.sched.current().sp()
+        });
 
         // safety: it is the right time to call
         unsafe { start_cold(stack_pointer) }

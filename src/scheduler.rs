@@ -1,3 +1,5 @@
+use cortex_m::peripheral::SYST;
+
 use crate::supervisor::with_supervisor;
 
 use self::task::{Task, TaskFrame};
@@ -15,15 +17,39 @@ extern "C" fn context_switch(stack_pointer: TaskFrame) -> TaskFrame {
     with_supervisor(|spv| spv.sched.context_switch(stack_pointer))
 }
 
+#[export_name = "SysTick"]
+pub fn system_tick() {
+    with_supervisor(|sp| sp.pend_switch())
+}
+
 // static SCHEDULER: Mutex<RefCell<Scheduler>> = Mutex::new(RefCell::new)
 
-#[derive(Default)]
-pub(crate) struct Scheduler {
+// #[derive(Default)]
+pub struct Scheduler {
+    systick: SYST,
+
     tasks: heapless::Vec<Task, 10>,
     last: usize,
 }
 
 impl Scheduler {
+    pub fn new(systick: SYST) -> Self {
+        Self {
+            systick,
+            tasks: Default::default(),
+            last: 0,
+        }
+    }
+
+    pub fn start_systick(&mut self) {
+        const TICK_SPEED: u32 = 0xFFFF;
+
+        self.systick.enable_interrupt();
+        self.systick.set_reload(TICK_SPEED);
+        self.systick.clear_current();
+        self.systick.enable_counter();
+    }
+
     pub(crate) fn current(&self) -> &Task {
         &self.tasks[self.last]
     }

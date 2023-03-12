@@ -6,10 +6,7 @@ extern crate alloc;
 use cortex_m_rt::entry;
 use panic_semihosting as _;
 
-use rust_rtos::{
-    api::{print, r#yield},
-    KernelBuilder,
-};
+use rust_rtos::{api::print, KernelBuilder};
 
 fn first_task() -> ! {
     let mut _a = 10;
