@@ -1,10 +1,10 @@
 use core::arch::asm;
 
-use crate::scheduler::task::TaskFrame;
+use crate::scheduler::task::FramePtr;
 
 #[no_mangle]
 #[naked]
-unsafe extern "C" fn save_task() -> TaskFrame {
+unsafe extern "C" fn save_task() -> FramePtr {
     asm!(
         "
             mrs r0, psp
@@ -27,9 +27,13 @@ unsafe extern "C" fn save_task() -> TaskFrame {
     )
 }
 
+/// NOTE: even though it loads the control register
+/// which indicates the processor to run using the psp
+/// IF it is called from an exception it will CONTINUE
+/// to use the MSP
 #[no_mangle]
 #[naked]
-unsafe extern "C" fn load_task(sp: TaskFrame) {
+unsafe extern "C" fn load_task(sp: FramePtr) {
     asm!(
         "
             adds r0, #20        // writeback constraint workaround
@@ -57,7 +61,7 @@ unsafe extern "C" fn load_task(sp: TaskFrame) {
 }
 
 #[naked]
-pub(crate) unsafe extern "C" fn start_cold(sp: TaskFrame) -> ! {
+pub(crate) unsafe extern "C" fn start_cold(sp: FramePtr) -> ! {
     asm!(
         "
             bl load_task

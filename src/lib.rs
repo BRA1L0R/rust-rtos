@@ -77,7 +77,7 @@ impl KernelBuilder {
 
         let stack_pointer = supervisor::with_supervisor(|spv| {
             spv.sched.start_systick();
-            spv.sched.current().sp()
+            spv.sched.schedule_next().sp()
         });
 
         // safety: it is the right time to call

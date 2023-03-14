@@ -35,7 +35,6 @@ struct CallArguments {
 
 impl IntoIterator for CallArguments {
     type Item = u32;
-
     type IntoIter = <[u32; 3] as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {

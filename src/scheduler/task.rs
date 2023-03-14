@@ -4,6 +4,7 @@ use core::{
 };
 
 extern crate alloc;
+
 use alloc::boxed::Box;
 use cortex_m::register::control::{Control, Npriv, Spsel};
 
@@ -76,7 +77,7 @@ impl ExtendedFrame {
 /// frame ready to be loaded
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
-pub struct TaskFrame(*mut ExtendedFrame);
+pub struct FramePtr(*mut ExtendedFrame);
 
 #[derive(Debug)]
 #[repr(C)]
@@ -84,7 +85,7 @@ pub struct Task {
     stack: Pin<Box<Stack>>,
     /// offset from stack base,
     /// NOT absolute address
-    pub(super) suspended_stack: TaskFrame,
+    pub(super) suspended_stack: FramePtr,
 }
 
 unsafe impl Send for Task {}
@@ -115,11 +116,11 @@ impl Task {
 
         Self {
             stack: Pin::new(stack),
-            suspended_stack: TaskFrame(exception_frame),
+            suspended_stack: FramePtr(exception_frame),
         }
     }
 
-    pub fn sp(&self) -> TaskFrame {
+    pub fn sp(&self) -> FramePtr {
         self.suspended_stack
     }
 }

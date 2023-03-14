@@ -2,7 +2,7 @@ use cortex_m::peripheral::SYST;
 
 use crate::supervisor::with_supervisor;
 
-use self::task::{Task, TaskFrame};
+use self::task::{FramePtr, Task};
 
 pub mod task;
 
@@ -13,7 +13,7 @@ pub mod task;
 
 /// Returned argument is the next task to be loaded
 #[no_mangle]
-extern "C" fn context_switch(stack_pointer: TaskFrame) -> TaskFrame {
+extern "C" fn context_switch(stack_pointer: FramePtr) -> FramePtr {
     with_supervisor(|spv| spv.sched.context_switch(stack_pointer))
 }
 
@@ -22,22 +22,21 @@ pub fn system_tick() {
     with_supervisor(|sp| sp.pend_switch())
 }
 
-// static SCHEDULER: Mutex<RefCell<Scheduler>> = Mutex::new(RefCell::new)
-
 // #[derive(Default)]
 pub struct Scheduler {
     systick: SYST,
 
-    tasks: heapless::Vec<Task, 10>,
-    last: usize,
+    ready: heapless::Deque<Task, 10>,
+    current: Option<Task>,
 }
 
 impl Scheduler {
     pub fn new(systick: SYST) -> Self {
         Self {
             systick,
-            tasks: Default::default(),
-            last: 0,
+            ready: Default::default(),
+            // pending: Default::default(),
+            current: None,
         }
     }
 
@@ -50,25 +49,25 @@ impl Scheduler {
         self.systick.enable_counter();
     }
 
-    pub(crate) fn current(&self) -> &Task {
-        &self.tasks[self.last]
+    pub fn schedule_next(&mut self) -> &Task {
+        if let Some(task) = self.current.take() {
+            self.ready.push_back(task).unwrap();
+        }
+
+        let task = self
+            .ready
+            .pop_front()
+            .expect("cannot run without ready tasks yet");
+
+        self.current.insert(task)
     }
 
-    fn current_mut(&mut self) -> &mut Task {
-        &mut self.tasks[self.last]
-    }
-
-    fn schedule_next(&mut self) -> &Task {
-        self.last = (self.last + 1) % self.tasks.len();
-        &self.tasks[self.last]
-    }
-
-    fn context_switch(&mut self, last_stack: TaskFrame) -> TaskFrame {
-        self.current_mut().suspended_stack = last_stack;
+    fn context_switch(&mut self, last_stack: FramePtr) -> FramePtr {
+        self.current.as_mut().unwrap().suspended_stack = last_stack;
         self.schedule_next().sp()
     }
 
     pub fn add_task(&mut self, task: Task) {
-        self.tasks.push(task).unwrap();
+        self.ready.push_back(task).unwrap();
     }
 }
