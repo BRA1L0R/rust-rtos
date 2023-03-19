@@ -1,35 +1,35 @@
 use core::arch::asm;
 
-use crate::scheduler::task::FramePtr;
+use crate::scheduler::task::{ExtendedFrame, FramePtr};
+
+// #[no_mangle]
+// #[naked]
+// unsafe extern "C" fn save_task() -> FramePtr {
+//     asm!(
+//         "
+//             mrs r0, psp
+//             subs r0, #40        // create space for *ExtendedFrame
+//             mov r1, r0          // keep r0 for return
+
+//             mrs r3, control         // load control
+//             stm r1!, {{r3,r4-r7}}   // store control,r4-r7
+
+//             mov r3, r8          // shift registers
+//             mov r4, r9
+//             mov r5, r10
+//             mov r6, r11
+//             mov r7, r12
+//             stm r1!, {{r3-r7}}  // store r8-r12
+
+//             bx lr
+//         ",
+//         options(noreturn)
+//     )
+// }
 
 #[no_mangle]
 #[naked]
-unsafe extern "C" fn save_task() -> FramePtr {
-    asm!(
-        "
-            mrs r0, psp
-            subs r0, #40        // create space for *ExtendedFrame
-            mov r1, r0          // keep r0 for return
-
-            mrs r3, control         // load control
-            stm r1!, {{r3,r4-r7}}   // store control,r4-r7
-
-            mov r3, r8          // shift registers
-            mov r4, r9
-            mov r5, r10
-            mov r6, r11
-            mov r7, r12
-            stm r1!, {{r3-r7}}  // store r8-r12
-
-            bx lr
-        ",
-        options(noreturn)
-    )
-}
-
-#[no_mangle]
-#[naked]
-unsafe extern "C" fn save_task_new() {
+unsafe extern "C" fn save_task() {
     asm!(
         "
             // prologue: save regs
@@ -39,7 +39,6 @@ unsafe extern "C" fn save_task_new() {
         
             mrs r0, psp
             subs r0, #40        // create space for *ExtendedFrame
-            // mov r1, r0       // keep r0 for return
 
             mrs r3, control         // load control
             stm r0!, {{r3,r4-r7}}   // store control,r4-r7
@@ -58,6 +57,25 @@ unsafe extern "C" fn save_task_new() {
         ",
         options(noreturn)
     )
+}
+
+/// ### Safety
+/// psp must be aligned to a standard
+/// hardware exception frame, and the task
+/// must have exited and saved its ExtendedFrame
+/// on its stack
+pub unsafe fn current_extended() -> FramePtr {
+    let extended: *mut ExtendedFrame;
+
+    asm!(
+        "
+            mrs {0}, psp
+            subs {0}, #40
+        ", 
+        out(reg) extended
+    );
+
+    FramePtr::new(extended)
 }
 
 /// NOTE: even though it loads the control register

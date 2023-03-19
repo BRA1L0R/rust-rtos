@@ -25,6 +25,8 @@ impl Supervisor {
     }
 
     pub(crate) fn pend_switch(&self) {
+        // Safety: setting the flag for pendsv is not
+        // actually unsafe
         unsafe { self.system_control.icsr.modify(|reg| reg | 0x1 << 28) };
     }
 }

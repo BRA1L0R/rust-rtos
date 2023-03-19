@@ -7,8 +7,6 @@ use core::arch::asm;
 unsafe extern "C" fn pendsv_trampoline() {
     asm!(
         "
-            bl save_task
-        0:
             bl context_switch // decide what task to start next
             bl load_task
 
@@ -25,22 +23,14 @@ unsafe extern "C" fn pendsv_trampoline() {
 unsafe extern "C" fn svcall_trampoline() {
     asm!(
         "
-            // Syscall ID is now passed
-            // as a parameter so the next
-            // commented section is not
-            // used
-
-            // mrs r0, psp
-            // // load address from stack
-            // ldr r0, [r0, #0x18]
-            // // load byte and put it in
-            // subs r0, #2
-            // ldrb r0, [r0]
-
-            bl save_task_new
-            
             push {{lr}}
+
+            push {{r0-r3}}
+            bl save_task
+
+            pop {{r0-r3}}
             bl svcall
+
             pop {{pc}}
         ",
         options(noreturn)
@@ -51,11 +41,12 @@ unsafe extern "C" fn svcall_trampoline() {
 #[naked]
 unsafe extern "C" fn systick_trampoline() {
     asm!(
-        "
-            bl save_task_new
+        "            
+            push {{lr}} // push before anything or else other bl-s might interfere
 
-            push {{lr}}
+            bl save_task
             bl system_tick
+
             pop {{pc}} // pop to pc triggers exit
         ",
         options(noreturn)

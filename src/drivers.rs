@@ -11,7 +11,6 @@ use crate::{mutex::Mutex, scheduler::task::PendingTask, supervisor, toinit::ToIn
 // Safety: must be called OUTSIDE a critical context
 pub unsafe fn init_drivers() {
     init_spec();
-    // DriverAccess(())
 }
 
 static SERIAL: Mutex<ToInit<Serial>> = Mutex::new(ToInit::uninit());
@@ -59,12 +58,13 @@ unsafe fn interrupt_handler() {
     // sure to have data
     let data = serial.inner.read().unwrap();
 
-    if let Some(task) = serial.subscribed.take() {
-        let task = task.resolve_args(0xFF);
-
-        let mut spv = supervisor::supervisor(&cs);
-        spv.sched.schedule_task(task);
-    }
+    match serial.subscribed.take() {
+        None => serial.buffer.push_back(data).unwrap(),
+        Some(task) => {
+            let task = task.resolve_args(data as u32);
+            supervisor::supervisor(&cs).sched.schedule_task(task);
+        }
+    };
 }
 
 /// Panic: if serial is not initialized

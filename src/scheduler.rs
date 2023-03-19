@@ -1,4 +1,4 @@
-use crate::supervisor;
+use crate::{arch::switching, supervisor};
 
 use self::task::{FramePtr, PendingTask, Task};
 use cortex_m::{interrupt::CriticalSection, peripheral::SYST};
@@ -12,19 +12,26 @@ pub mod task;
 
 /// Returned argument is the next task to be loaded
 #[no_mangle]
-extern "C" fn context_switch(stack_pointer: FramePtr) -> FramePtr {
+extern "C" fn context_switch() -> FramePtr {
     // Safety: all interrupts have same priority
     let cs = unsafe { CriticalSection::new() };
 
     let mut spv = supervisor::supervisor(&cs);
-    spv.sched.context_switch(stack_pointer)
+    spv.sched.schedule_next().sp()
 }
 
 #[no_mangle]
 extern "C" fn system_tick() {
     // Safety: all interrupts have same priority
     let cs = unsafe { CriticalSection::new() };
-    supervisor::supervisor(&cs).pend_switch();
+
+    // Safety: systemtick is called right after
+    // and only after saving a frame
+    let frame = unsafe { switching::current_extended() };
+    let mut spv = supervisor::supervisor(&cs);
+
+    spv.sched.save_current(frame);
+    spv.pend_switch();
 }
 
 // #[derive(Default)]
@@ -75,9 +82,8 @@ impl Scheduler {
         PendingTask::new(task)
     }
 
-    fn context_switch(&mut self, last_stack: FramePtr) -> FramePtr {
-        self.current.as_mut().unwrap().suspended_stack = last_stack;
-        self.schedule_next().sp()
+    pub fn save_current(&mut self, frame: FramePtr) {
+        self.current.as_mut().unwrap().suspended_stack = frame;
     }
 
     pub fn schedule_task(&mut self, task: Task) {

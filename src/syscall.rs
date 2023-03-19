@@ -1,6 +1,6 @@
 use cortex_m::interrupt::CriticalSection;
 
-use crate::{drivers, supervisor};
+use crate::{arch::switching, drivers, supervisor};
 use core::fmt::Debug;
 
 #[repr(u32)]
@@ -60,6 +60,13 @@ unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
     // get preempted
     let cs = unsafe { CriticalSection::new() };
     let mut supervisor = supervisor::supervisor(&cs);
+
+    // save current extended frame in case
+    // svcalls does not return to caller
+    // Safety: comes from a trampoline that saves the
+    // frame information
+    let frame = unsafe { switching::current_extended() };
+    supervisor.sched.save_current(frame);
 
     let id = SVCallId::try_from(id).unwrap();
     let mut args = args.into_iter();
