@@ -27,6 +27,39 @@ unsafe extern "C" fn save_task() -> FramePtr {
     )
 }
 
+#[no_mangle]
+#[naked]
+unsafe extern "C" fn save_task_new() {
+    asm!(
+        "
+            // prologue: save regs
+            // reason: syscalls need these regs
+            // to restore use if not switching
+            push {{r4-r7}}
+        
+            mrs r0, psp
+            subs r0, #40        // create space for *ExtendedFrame
+            // mov r1, r0       // keep r0 for return
+
+            mrs r3, control         // load control
+            stm r0!, {{r3,r4-r7}}   // store control,r4-r7
+
+            mov r3, r8          // shift registers
+            mov r4, r9
+            mov r5, r10
+            mov r6, r11
+            mov r7, r12
+            stm r0!, {{r3-r7}}  // store r8-r12
+
+            // epilogue: restore regs
+            pop {{r4-r7}}
+
+            bx lr
+        ",
+        options(noreturn)
+    )
+}
+
 /// NOTE: even though it loads the control register
 /// which indicates the processor to run using the psp
 /// IF it is called from an exception it will CONTINUE

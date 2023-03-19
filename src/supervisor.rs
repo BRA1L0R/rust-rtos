@@ -1,16 +1,15 @@
-use core::cell::RefCell;
+use core::cell::RefMut;
 
-use crate::scheduler::Scheduler;
-
-extern crate alloc;
-
+use crate::{mutex::Mutex, scheduler::Scheduler, toinit::ToInit};
 use cortex_m::{
-    interrupt::{free, Mutex},
+    interrupt::{free, CriticalSection},
     peripheral::SCB,
 };
 
+extern crate alloc;
+
 /// global supervisor instance
-static SUPERVISOR: Mutex<RefCell<Option<Supervisor>>> = Mutex::new(RefCell::new(None));
+static SUPERVISOR: Mutex<ToInit<Supervisor>> = Mutex::new(ToInit::uninit());
 
 pub struct Supervisor {
     pub(crate) sched: Scheduler,
@@ -31,7 +30,7 @@ impl Supervisor {
 }
 
 pub fn init_supervisor(sup: Supervisor) {
-    free(|cs| SUPERVISOR.borrow(cs).replace(Some(sup)));
+    free(|cs| SUPERVISOR.borrow_mut(cs).init(sup));
 }
 
 /// Note: code executed in the closure is subject
@@ -39,13 +38,17 @@ pub fn init_supervisor(sup: Supervisor) {
 ///
 /// Panic:
 /// panics if not executed inside of a supervised context.
-pub(crate) fn with_supervisor<T>(m: impl Fn(&mut Supervisor) -> T) -> T {
-    free(|cs| {
-        let mut supervisor = SUPERVISOR.borrow(cs).borrow_mut();
-        let supervisor = supervisor
-            .as_mut()
-            .expect("not running inside a supervised context");
+// pub(crate) fn with_supervisor<T>(m: impl FnOnce(&mut Supervisor) -> T) -> T {
+//     free(|cs| {
+//         let mut supervisor = SUPERVISOR.borrow_mut(cs);
+//         let supervisor = supervisor.expect_mut("not running inside a supervised context");
 
-        m(supervisor)
+//         m(supervisor)
+//     })
+// }
+
+pub(crate) fn supervisor(cs: &CriticalSection) -> RefMut<'_, Supervisor> {
+    RefMut::map(SUPERVISOR.borrow_mut(cs), |f| {
+        f.expect_mut("not running in a supervised context")
     })
 }

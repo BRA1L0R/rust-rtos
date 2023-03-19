@@ -1,14 +1,13 @@
+extern crate alloc;
+
+use crate::TaskEntrypoint;
+
+use alloc::boxed::Box;
 use core::{
     mem::{align_of, size_of, MaybeUninit},
     pin::Pin,
 };
-
-extern crate alloc;
-
-use alloc::boxed::Box;
 use cortex_m::register::control::{Control, Npriv, Spsel};
-
-use crate::TaskEntrypoint;
 
 const STACK_SIZE: usize = 256;
 
@@ -33,7 +32,7 @@ impl core::ops::DerefMut for Stack {
 
 #[derive(Default)]
 #[repr(C)]
-struct ExtendedFrame {
+pub struct ExtendedFrame {
     // extended register content [40 bytes]
     /// control register
     control: u32,
@@ -79,6 +78,24 @@ impl ExtendedFrame {
 #[derive(Debug, Clone, Copy)]
 pub struct FramePtr(*mut ExtendedFrame);
 
+impl FramePtr {
+    pub unsafe fn new(frame: *mut ExtendedFrame) -> Self {
+        Self(frame)
+    }
+}
+
+impl AsRef<ExtendedFrame> for FramePtr {
+    fn as_ref(&self) -> &ExtendedFrame {
+        unsafe { self.0.as_ref() }.unwrap()
+    }
+}
+
+impl AsMut<ExtendedFrame> for FramePtr {
+    fn as_mut(&mut self) -> &mut ExtendedFrame {
+        unsafe { self.0.as_mut() }.unwrap()
+    }
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct Task {
@@ -122,5 +139,21 @@ impl Task {
 
     pub fn sp(&self) -> FramePtr {
         self.suspended_stack
+    }
+}
+
+pub struct PendingTask(Task);
+
+impl PendingTask {
+    pub fn new(task: Task) -> PendingTask {
+        PendingTask(task)
+    }
+
+    // TODO
+    pub fn resolve_args(mut self, r0: u32) -> Task {
+        let stack = self.0.suspended_stack.as_mut();
+        stack.r0 = r0;
+
+        self.0
     }
 }

@@ -1,8 +1,7 @@
-use cortex_m::peripheral::SYST;
+use crate::supervisor;
 
-use crate::supervisor::with_supervisor;
-
-use self::task::{FramePtr, Task};
+use self::task::{FramePtr, PendingTask, Task};
+use cortex_m::{interrupt::CriticalSection, peripheral::SYST};
 
 pub mod task;
 
@@ -14,12 +13,18 @@ pub mod task;
 /// Returned argument is the next task to be loaded
 #[no_mangle]
 extern "C" fn context_switch(stack_pointer: FramePtr) -> FramePtr {
-    with_supervisor(|spv| spv.sched.context_switch(stack_pointer))
+    // Safety: all interrupts have same priority
+    let cs = unsafe { CriticalSection::new() };
+
+    let mut spv = supervisor::supervisor(&cs);
+    spv.sched.context_switch(stack_pointer)
 }
 
-#[export_name = "SysTick"]
-pub fn system_tick() {
-    with_supervisor(|sp| sp.pend_switch())
+#[no_mangle]
+extern "C" fn system_tick() {
+    // Safety: all interrupts have same priority
+    let cs = unsafe { CriticalSection::new() };
+    supervisor::supervisor(&cs).pend_switch();
 }
 
 // #[derive(Default)]
@@ -35,7 +40,6 @@ impl Scheduler {
         Self {
             systick,
             ready: Default::default(),
-            // pending: Default::default(),
             current: None,
         }
     }
@@ -62,12 +66,21 @@ impl Scheduler {
         self.current.insert(task)
     }
 
+    pub fn pend_current(&mut self) -> PendingTask {
+        let task = self
+            .current
+            .take()
+            .expect("called pend without any task running");
+
+        PendingTask::new(task)
+    }
+
     fn context_switch(&mut self, last_stack: FramePtr) -> FramePtr {
         self.current.as_mut().unwrap().suspended_stack = last_stack;
         self.schedule_next().sp()
     }
 
-    pub fn add_task(&mut self, task: Task) {
+    pub fn schedule_task(&mut self, task: Task) {
         self.ready.push_back(task).unwrap();
     }
 }

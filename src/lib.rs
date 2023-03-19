@@ -4,6 +4,7 @@
 // use cortex_m::register::control::Control;
 
 use allocator::init_allocator;
+use cortex_m::interrupt::free;
 use drivers::init_drivers;
 use scheduler::Scheduler;
 use supervisor::{init_supervisor, Supervisor};
@@ -12,9 +13,11 @@ mod allocator;
 pub mod api;
 mod arch;
 mod drivers;
+pub mod mutex;
 mod scheduler;
 mod supervisor;
 mod syscall;
+pub mod toinit;
 
 pub type TaskEntrypoint = fn() -> !;
 
@@ -29,14 +32,19 @@ impl KernelBuilder {
         // TODO: change with dynamic size
         unsafe { init_allocator(cortex_m_rt::heap_start(), 2048) }
 
-        // init devices
-        init_drivers();
-
         // init scheduler and supervisor
         let scheduler = Scheduler::new(per.SYST);
         init_supervisor(Supervisor::new(per.SCB, scheduler));
 
         Self(())
+    }
+
+    /// # Safety
+    /// must be called outside a
+    /// critical context
+    pub unsafe fn init_drivers(self) -> Self {
+        init_drivers();
+        self
     }
 
     /// Allocates a new stack and sets the default registers
@@ -48,7 +56,8 @@ impl KernelBuilder {
     pub fn add_task(self, entry: TaskEntrypoint) -> Self {
         use scheduler::task::Task;
 
-        supervisor::with_supervisor(|spv| spv.sched.add_task(Task::create(entry)));
+        let task = Task::create(entry);
+        free(|cs| supervisor::supervisor(cs).sched.schedule_task(task));
 
         self
     }
@@ -75,7 +84,8 @@ impl KernelBuilder {
             "starting a supervised context using the process stack pointer"
         );
 
-        let stack_pointer = supervisor::with_supervisor(|spv| {
+        let stack_pointer = free(|cs| {
+            let mut spv = supervisor::supervisor(cs);
             spv.sched.start_systick();
             spv.sched.schedule_next().sp()
         });
@@ -84,11 +94,3 @@ impl KernelBuilder {
         unsafe { start_cold(stack_pointer) }
     }
 }
-
-// unsafe fn modify_control(m: impl Fn(&mut Control)) {
-//     use cortex_m::register::control;
-
-//     let mut control_reg = control::read();
-//     m(&mut control_reg);
-//     control::write(control_reg);
-// }

@@ -36,10 +36,27 @@ unsafe extern "C" fn svcall_trampoline() {
             // // load byte and put it in
             // subs r0, #2
             // ldrb r0, [r0]
+
+            bl save_task_new
             
             push {{lr}}
             bl svcall
             pop {{pc}}
+        ",
+        options(noreturn)
+    )
+}
+
+#[export_name = "SysTick"]
+#[naked]
+unsafe extern "C" fn systick_trampoline() {
+    asm!(
+        "
+            bl save_task_new
+
+            push {{lr}}
+            bl system_tick
+            pop {{pc}} // pop to pc triggers exit
         ",
         options(noreturn)
     )

@@ -1,12 +1,13 @@
-use crate::drivers;
-use crate::supervisor::with_supervisor;
+use cortex_m::interrupt::CriticalSection;
+
+use crate::{drivers, supervisor};
 use core::fmt::Debug;
-use core::fmt::Write;
 
 #[repr(u32)]
 pub enum SVCallId {
     Yield = 0x00,
     Print,
+    ReadChar,
 }
 
 pub struct InvalidSVC;
@@ -23,6 +24,7 @@ impl TryFrom<u32> for SVCallId {
         match value {
             0x00 => Ok(SVCallId::Yield),
             0x01 => Ok(SVCallId::Print),
+            0x02 => Ok(SVCallId::ReadChar),
             _ => Err(InvalidSVC),
         }
     }
@@ -53,19 +55,35 @@ macro_rules! next_as {
 /// function uses non-initialized data anyways
 #[no_mangle]
 unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
+    // Safety: since sycalls have the same priority
+    // as all other interrupts there's no way it can
+    // get preempted
+    let cs = unsafe { CriticalSection::new() };
+    let mut supervisor = supervisor::supervisor(&cs);
+
     let id = SVCallId::try_from(id).unwrap();
     let mut args = args.into_iter();
 
     match id {
-        SVCallId::Yield => with_supervisor(|sp| sp.pend_switch()),
+        SVCallId::Yield => supervisor.pend_switch(),
         SVCallId::Print => {
             let data: *const u8 = next_as!(args).unwrap();
             let length = next_as!(args).unwrap();
 
             let data = core::slice::from_raw_parts(data, length);
-            let data = core::str::from_utf8_unchecked(data);
+            let _data = core::str::from_utf8_unchecked(data);
 
-            write!(drivers::tty_writer(), "{data}").unwrap();
+            // drivers::serial_writer().write_str(data).unwrap();
+            todo!()
+        }
+        SVCallId::ReadChar => {
+            let mut serial = drivers::serial(&cs);
+            assert!(serial.read_char().is_none());
+
+            let task = supervisor.sched.pend_current();
+            serial.subscribe(task);
+
+            supervisor.pend_switch()
         }
     }
 }
