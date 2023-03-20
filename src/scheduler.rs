@@ -3,6 +3,7 @@ use crate::{arch::switching, supervisor};
 use self::task::{FramePtr, PendingTask, Task};
 use cortex_m::{interrupt::CriticalSection, peripheral::SYST};
 
+pub mod arguments;
 pub mod task;
 
 // r0-r3 is already saved manually so we can use it
@@ -52,7 +53,7 @@ impl Scheduler {
     }
 
     pub fn start_systick(&mut self) {
-        const TICK_SPEED: u32 = 0xFFFF;
+        const TICK_SPEED: u32 = 0x1FFF;
 
         self.systick.enable_interrupt();
         self.systick.set_reload(TICK_SPEED);

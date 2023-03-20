@@ -30,3 +30,7 @@ pub fn read_char() -> u8 {
 
     res
 }
+
+pub fn free() {
+    unsafe { syscall!(SVCallId::FreeMem) }
+}

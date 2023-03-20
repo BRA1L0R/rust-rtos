@@ -1,6 +1,6 @@
 use cortex_m::interrupt::CriticalSection;
 
-use crate::{arch::switching, drivers, supervisor};
+use crate::{allocator, arch::switching, drivers, supervisor};
 use core::fmt::Debug;
 
 #[repr(u32)]
@@ -8,6 +8,7 @@ pub enum SVCallId {
     Yield = 0x00,
     Print,
     ReadChar,
+    FreeMem,
 }
 
 pub struct InvalidSVC;
@@ -25,6 +26,7 @@ impl TryFrom<u32> for SVCallId {
             0x00 => Ok(SVCallId::Yield),
             0x01 => Ok(SVCallId::Print),
             0x02 => Ok(SVCallId::ReadChar),
+            0x03 => Ok(SVCallId::FreeMem),
             _ => Err(InvalidSVC),
         }
     }
@@ -54,7 +56,7 @@ macro_rules! next_as {
 /// during a syscall can cause undefined behaviour as the receiver
 /// function uses non-initialized data anyways
 #[no_mangle]
-unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
+extern "C" fn svcall(id: u32, args: CallArguments) {
     // Safety: since sycalls have the same priority
     // as all other interrupts there's no way it can
     // get preempted
@@ -77,20 +79,26 @@ unsafe extern "C" fn svcall(id: u32, args: CallArguments) {
             let data: *const u8 = next_as!(args).unwrap();
             let length = next_as!(args).unwrap();
 
-            let data = core::slice::from_raw_parts(data, length);
-            let _data = core::str::from_utf8_unchecked(data);
+            // NOT SAFE: user could leak other task's or
+            // even kernel memory
+            let data = unsafe { core::slice::from_raw_parts(data, length) };
+            let data = core::str::from_utf8(data).expect("utf8 encoded string");
 
-            // drivers::serial_writer().write_str(data).unwrap();
-            todo!()
+            let mut serial = drivers::serial(&cs);
+            serial.write_str(data)
         }
         SVCallId::ReadChar => {
             let mut serial = drivers::serial(&cs);
             assert!(serial.read_char().is_none());
 
             let task = supervisor.sched.pend_current();
-            serial.subscribe(task);
 
+            serial.subscribe(task);
             supervisor.pend_switch()
+        }
+        SVCallId::FreeMem => {
+            let (free, used) = allocator::free();
+            cortex_m::asm::bkpt();
         }
     }
 }

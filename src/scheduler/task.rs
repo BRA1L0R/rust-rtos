@@ -9,7 +9,9 @@ use core::{
 };
 use cortex_m::register::control::{Control, Npriv, Spsel};
 
-const STACK_SIZE: usize = 256;
+use super::arguments::AbiArguments;
+
+const STACK_SIZE: usize = 512;
 
 #[repr(C)]
 #[repr(align(4))]
@@ -42,10 +44,7 @@ pub struct ExtendedFrame {
     high_regs: [u32; 5],
 
     // ExceptionFrame
-    r0: u32,
-    r1: u32,
-    r2: u32,
-    r3: u32,
+    abi_regs: [u32; 4], // r0-r3
     r12: u32,
     lr: u32,
     pc: usize,
@@ -137,6 +136,11 @@ impl Task {
         }
     }
 
+    fn apply<const U: usize>(&mut self, args: AbiArguments<U>) {
+        let stack = self.suspended_stack.as_mut();
+        stack.abi_regs[..U].copy_from_slice(args.pushed());
+    }
+
     pub fn sp(&self) -> FramePtr {
         self.suspended_stack
     }
@@ -150,10 +154,8 @@ impl PendingTask {
     }
 
     // TODO
-    pub fn resolve_args(mut self, r0: u32) -> Task {
-        let stack = self.0.suspended_stack.as_mut();
-        stack.r0 = r0;
-
+    pub fn resolve_args<const U: usize>(mut self, args: AbiArguments<U>) -> Task {
+        self.0.apply(args);
         self.0
     }
 }

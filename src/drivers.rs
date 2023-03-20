@@ -1,12 +1,16 @@
 #[cfg(feature = "l053r8")]
 pub mod l053r8;
-use core::cell::RefMut;
-
-use cortex_m::{interrupt::CriticalSection, prelude::_embedded_hal_serial_Read};
 #[cfg(feature = "l053r8")]
 pub use l053r8::*;
 
-use crate::{mutex::Mutex, scheduler::task::PendingTask, supervisor, toinit::ToInit};
+use crate::{
+    mutex::Mutex,
+    scheduler::{arguments::AbiArguments, task::PendingTask},
+    supervisor,
+    toinit::ToInit,
+};
+use core::{cell::RefMut, fmt::Write};
+use cortex_m::{interrupt::CriticalSection, prelude::_embedded_hal_serial_Read};
 
 // Safety: must be called OUTSIDE a critical context
 pub unsafe fn init_drivers() {
@@ -14,6 +18,9 @@ pub unsafe fn init_drivers() {
 }
 
 static SERIAL: Mutex<ToInit<Serial>> = Mutex::new(ToInit::uninit());
+
+#[derive(Debug)]
+pub struct SerialError;
 
 pub struct Serial {
     inner: SerialSpec,
@@ -29,6 +36,10 @@ impl Serial {
             buffer: heapless::Deque::new(),
             subscribed: None,
         }
+    }
+
+    pub fn write_str(&mut self, data: &str) {
+        self.inner.write_str(data).unwrap()
     }
 
     pub fn read_char(&mut self) -> Option<u8> {
@@ -61,7 +72,9 @@ unsafe fn interrupt_handler() {
     match serial.subscribed.take() {
         None => serial.buffer.push_back(data).unwrap(),
         Some(task) => {
-            let task = task.resolve_args(data as u32);
+            let args = AbiArguments::new().push(data as u32);
+
+            let task = task.resolve_args(args);
             supervisor::supervisor(&cs).sched.schedule_task(task);
         }
     };

@@ -30,7 +30,7 @@ impl KernelBuilder {
     pub fn new(per: cortex_m::Peripherals) -> Self {
         // init allocator
         // TODO: change with dynamic size
-        unsafe { init_allocator(cortex_m_rt::heap_start(), 2048) }
+        unsafe { init_allocator(cortex_m_rt::heap_start(), 4096) }
 
         // init scheduler and supervisor
         let scheduler = Scheduler::new(per.SYST);
