@@ -3,6 +3,11 @@ pub mod l053r8;
 #[cfg(feature = "l053r8")]
 pub use l053r8::*;
 
+#[cfg(feature = "f401")]
+pub mod f401;
+#[cfg(feature = "f401")]
+pub use f401::*;
+
 use crate::{
     mutex::Mutex,
     scheduler::{arguments::AbiArguments, task::PendingTask},

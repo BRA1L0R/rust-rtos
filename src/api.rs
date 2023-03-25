@@ -1,13 +1,13 @@
 use core::arch::asm;
 
-use super::syscall::SVCallId;
+use super::syscall::ids::SVCallId;
 
 macro_rules! syscall {
-    ($id:expr $(,$n:tt : $val:expr)*) => {
+    ($id:expr $(,$n:tt : $val:ident)*) => {
         asm!("SVC #0", in("r0") $id as u32, $(in($n) $val, )*)
     };
 
-    ($id:expr $(,$n:tt : $val:expr)* => $or:tt : $oe:tt $(, $b:tt : $out:tt)*) => {
+    ($id:expr $(,$n:tt : $val:ident)* => $or:tt : $oe:ident $(, $b:tt : $out:ident)*) => {
         asm!("SVC #0", in("r0") $id as u32, $(in($n) $val, )* lateout($or) $oe, $(lateout($b) $out, )*)
     }
 }
@@ -31,6 +31,8 @@ pub fn read_char() -> u8 {
     res
 }
 
-pub fn free() {
-    unsafe { syscall!(SVCallId::FreeMem) }
+pub fn free() -> (usize, usize) {
+    let (used, free): (usize, usize);
+    unsafe { syscall!(SVCallId::FreeMem => "r0": used, "r1": free) };
+    (used, free)
 }

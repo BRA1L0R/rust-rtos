@@ -1,9 +1,13 @@
 use crate::{arch::switching, supervisor};
 
-use self::task::{FramePtr, PendingTask, Task};
+use self::{
+    handle::TaskHandle,
+    task::{FramePtr, SuspendedTask, Task},
+};
 use cortex_m::{interrupt::CriticalSection, peripheral::SYST};
 
 pub mod arguments;
+mod handle;
 pub mod task;
 
 // r0-r3 is already saved manually so we can use it
@@ -18,7 +22,7 @@ extern "C" fn context_switch() -> FramePtr {
     let cs = unsafe { CriticalSection::new() };
 
     let mut spv = supervisor::supervisor(&cs);
-    spv.sched.schedule_next().sp()
+    spv.sched.schedule_next()
 }
 
 #[no_mangle]
@@ -61,7 +65,7 @@ impl Scheduler {
         self.systick.enable_counter();
     }
 
-    pub fn schedule_next(&mut self) -> &Task {
+    pub fn schedule_next(&mut self) -> FramePtr {
         if let Some(task) = self.current.take() {
             self.ready.push_back(task).unwrap();
         }
@@ -71,20 +75,23 @@ impl Scheduler {
             .pop_front()
             .expect("cannot run without ready tasks yet");
 
-        self.current.insert(task)
+        self.current.insert(task).sp()
     }
 
-    pub fn pend_current(&mut self) -> PendingTask {
-        let task = self
-            .current
-            .take()
-            .expect("called pend without any task running");
+    // pub fn suspend_current(&mut self) -> SuspendedTask {
+    //     let task = self
+    //         .current
+    //         .take()
+    //         .expect("called suspend without any task running");
 
-        PendingTask::new(task)
-    }
+    //     SuspendedTask::new(task)
+    // }
 
-    pub fn save_current(&mut self, frame: FramePtr) {
-        self.current.as_mut().unwrap().suspended_stack = frame;
+    pub fn save_current(&mut self, frame: FramePtr) -> TaskHandle<'_> {
+        let mut task = TaskHandle::new(&mut self.current).unwrap();
+        task.save_sp(frame);
+
+        task
     }
 
     pub fn schedule_task(&mut self, task: Task) {

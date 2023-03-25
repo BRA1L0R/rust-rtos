@@ -6,7 +6,7 @@
             "command": "build",
             "args": [
                 "--features",
-                "cortex-m0+ l053r8",
+                "f401",
             ],
             "problemMatcher": [
                 "$rustc"

@@ -2,31 +2,6 @@ use core::arch::asm;
 
 use crate::scheduler::task::{ExtendedFrame, FramePtr};
 
-// #[no_mangle]
-// #[naked]
-// unsafe extern "C" fn save_task() -> FramePtr {
-//     asm!(
-//         "
-//             mrs r0, psp
-//             subs r0, #40        // create space for *ExtendedFrame
-//             mov r1, r0          // keep r0 for return
-
-//             mrs r3, control         // load control
-//             stm r1!, {{r3,r4-r7}}   // store control,r4-r7
-
-//             mov r3, r8          // shift registers
-//             mov r4, r9
-//             mov r5, r10
-//             mov r6, r11
-//             mov r7, r12
-//             stm r1!, {{r3-r7}}  // store r8-r12
-
-//             bx lr
-//         ",
-//         options(noreturn)
-//     )
-// }
-
 #[no_mangle]
 #[naked]
 unsafe extern "C" fn save_task() {

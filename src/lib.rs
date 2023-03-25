@@ -5,14 +5,14 @@
 
 use allocator::init_allocator;
 use cortex_m::interrupt::free;
-use drivers::init_drivers;
+// use drivers::init_drivers;
 use scheduler::Scheduler;
 use supervisor::{init_supervisor, Supervisor};
 
 mod allocator;
 pub mod api;
 mod arch;
-mod drivers;
+// mod drivers;
 pub mod mutex;
 mod scheduler;
 mod supervisor;
@@ -43,7 +43,7 @@ impl KernelBuilder {
     /// must be called outside a
     /// critical context
     pub unsafe fn init_drivers(self) -> Self {
-        init_drivers();
+        // init_drivers();
         self
     }
 
@@ -87,7 +87,7 @@ impl KernelBuilder {
         let stack_pointer = free(|cs| {
             let mut spv = supervisor::supervisor(cs);
             spv.sched.start_systick();
-            spv.sched.schedule_next().sp()
+            spv.sched.schedule_next()
         });
 
         // safety: it is the right time to call

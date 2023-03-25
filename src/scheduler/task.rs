@@ -41,7 +41,7 @@ pub struct ExtendedFrame {
     /// contains r4-r7
     low_regs: [u32; 4],
     /// contains r8-r12
-    high_regs: [u32; 5],
+    high_regs: [u32; 5], // TODO: remove r12
 
     // ExceptionFrame
     abi_regs: [u32; 4], // r0-r3
@@ -101,7 +101,7 @@ pub struct Task {
     stack: Pin<Box<Stack>>,
     /// offset from stack base,
     /// NOT absolute address
-    pub(super) suspended_stack: FramePtr,
+    suspended_stack: FramePtr,
 }
 
 unsafe impl Send for Task {}
@@ -136,9 +136,18 @@ impl Task {
         }
     }
 
-    fn apply<const U: usize>(&mut self, args: AbiArguments<U>) {
+    /// Modified r0-r3 in order which are the
+    /// argument / return registers
+    pub fn apply<const U: usize>(&mut self, args: AbiArguments<U>) {
         let stack = self.suspended_stack.as_mut();
         stack.abi_regs[..U].copy_from_slice(args.pushed());
+    }
+
+    pub fn save_sp(&mut self, sp: FramePtr) {
+        let contained = self.stack.as_ptr_range().contains(&(sp.0 as _));
+        assert!(contained, "stack overflow");
+
+        self.suspended_stack = sp;
     }
 
     pub fn sp(&self) -> FramePtr {
@@ -146,11 +155,13 @@ impl Task {
     }
 }
 
-pub struct PendingTask(Task);
+/// Type for tasks that are temporarily
+/// diverted from normal scheduling, hence ownership
+pub struct SuspendedTask(Task);
 
-impl PendingTask {
-    pub fn new(task: Task) -> PendingTask {
-        PendingTask(task)
+impl SuspendedTask {
+    pub fn new(task: Task) -> SuspendedTask {
+        SuspendedTask(task)
     }
 
     // TODO
@@ -158,4 +169,6 @@ impl PendingTask {
         self.0.apply(args);
         self.0
     }
+
+    // pub fn stop(self) {}
 }
