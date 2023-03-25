@@ -1,8 +1,0 @@
-{
-  "cortex-debug.variableUseNaturalFormat": true,
-  "rust-analyzer.procMacro.enable": true,
-  "rust-analyzer.cargo.features": [
-    "cortex-m4",
-    "f401"
-  ],
-}
